@@ -73,7 +73,7 @@ namespace PortPing
             }
             finally {
                 pingResult.LatencyMs = watch.ElapsedMilliseconds;
-                client.Dispose();
+                client.Close();
             }
 
             return pingResult;
