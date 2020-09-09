@@ -48,7 +48,7 @@ steps:
 
 - task: GitHubRelease@1
   inputs:
-    gitHubConnection: 'github connection azure devops'
+    gitHubConnection: 'github.com_changbowen'
     repositoryName: '$(Build.Repository.Name)'
     action: 'create'
     target: '$(Build.SourceVersion)'
