@@ -2,4 +2,4 @@
 
 # PortPing
 
-Port test tool with latency info and more.
+Command line tool for testing port reachability with latency info and more.
