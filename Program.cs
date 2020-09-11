@@ -5,6 +5,7 @@ using System.Net.Sockets;
 using System.Diagnostics;
 using System.Threading;
 using System.Net;
+using System.Net.NetworkInformation;
 
 namespace PortPing
 {
@@ -23,25 +24,55 @@ namespace PortPing
     {
         static void Main(string[] args)
         {
-            if (args?.Length < 2) {
-                Console.Write(UsageInfo);
+            if (args?.Length == 0 || !args[0].Contains(":")) {
+                Console.WriteLine(UsageInfo);
                 return;
             }
 
-            var host = args[0];
-            var port = int.Parse(args[1]);
-            var i = Array.IndexOf(args, @"-t");
-            var timeout = i == -1 ? 2000 : int.Parse(args[i + 1]);
+            // parse arguments
+            string arg_host;
+            int arg_port;
+            // optional arguments
+            var arg_timeout = 5000;
+            //var arg_protocol = ProtocolType.Tcp;
+            IPEndPoint arg_source = null;
+
+            try {
+                string[] _sa; int _i;
+
+                _sa = args[0].Split(':');
+                arg_host = _sa[0];
+                arg_port = int.Parse(_sa[1]);
+
+                _i = Array.IndexOf(args, @"-t");
+                if (_i > 0) arg_timeout = int.Parse(args[_i + 1]);
+
+                //_i = Array.IndexOf(args, @"-p");
+                //if (_i > 0) arg_protocol = (ProtocolType)Enum.Parse(typeof(ProtocolType), args[_i + 1], true);
+
+                _i = Array.IndexOf(args, @"-s");
+                if (_i > 0) {
+                    _sa = args[_i + 1].Split(':');
+                    arg_source = new IPEndPoint(IPAddress.Parse(_sa[0]), _sa.Length > 1 ? int.Parse(_sa[1]) : 0);
+                    if (!NetworkInterface.GetAllNetworkInterfaces().Where(ii => ii.OperationalStatus == OperationalStatus.Up)
+                        .SelectMany(ii => ii.GetIPProperties().UnicastAddresses).Any(ii => ii.Address.Equals(arg_source.Address)))
+                        throw new ArgumentException(@"Source address is invalid.");
+                }
+            }
+            catch (Exception ex) {
+                Console.WriteLine($"Invalid arguments.\r\n{getAllMessages(ex)}");
+                return;
+            }
 
             string formatResult(PingResult pingResult) =>
-                $@"Time: {pingResult.LatencyMs.ToString().PadLeft(timeout.ToString().Length)}ms; " +
-                $@"TTL: {pingResult.Ttl,3}; " +
-                $@"Protocol: {pingResult.Protocol}; " +
+                $@"Time: {pingResult.LatencyMs.ToString().PadLeft(arg_timeout.ToString().Length)}ms; " +
+                $@"{(pingResult.Ttl != default ? $@"TTL: {pingResult.Ttl,3}; " : null)}" +
+                $@"{(pingResult.Protocol != default ? $@"Protocol: {pingResult.Protocol}; " : null)}" +
                 $@"{(pingResult.Source != null ? $@"From: {pingResult.Source,21}; " : null)}" +
                 $@"{(pingResult.Destination != null ? $@"To: {pingResult.Destination,21}; " : null)}";
 
             while (true) {
-                var result = CheckPort(host, port, timeout);
+                var result = CheckPort(arg_host, arg_port, arg_source, arg_timeout);
                 if (result.Success)
                     Console.WriteLine($"Connection succeeded. {formatResult(result)}");
                 else
@@ -51,13 +82,14 @@ namespace PortPing
             }
         }
 
-        static PingResult CheckPort(string host, int port, int timeout)
+        static PingResult CheckPort(string host, int port, IPEndPoint source = null, int timeout = 5000)
         {
             var watch = new Stopwatch();
             var pingResult = new PingResult() { Success = false };
-            var client = new TcpClient();
+            TcpClient client = null;
 
             try {
+                client = source == null ? new TcpClient() : new TcpClient(source);
                 watch.Restart();
                 var task = client.ConnectAsync(host, port);
                 if (task.Wait(timeout)) {//if fails within timeout, task.Wait still returns true.
@@ -85,7 +117,7 @@ namespace PortPing
                     pingResult.Source = client.Client.LocalEndPoint;
                 }
                 catch { }
-                client.Close();
+                client?.Close();
             }
 
             return pingResult;
@@ -100,10 +132,10 @@ namespace PortPing
         }
 
         private const string UsageInfo = @"
-Usage: portping.exe host port [-t timeout]
-    host    The hostname or IP address to connect to.
-    port    Port number to connect to.
-    -t      Timeout in milliseconds to wait for each ping. Default is 2000ms.
+Usage: portping.exe host:port [-t timeout] [-s source[:port]]
+    host:port           The hostname / IP address and port to connect to.
+    -t timeout          Timeout in milliseconds to wait for each ping. Default is 5000ms.
+    -s source[:port]    IP address of the source interface with optional port to use.
 ";
     }
 }
