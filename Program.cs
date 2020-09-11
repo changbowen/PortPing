@@ -30,11 +30,7 @@ namespace PortPing
 
             while (true) {
                 var result = CheckPort(host, port, timeout);
-                if (result.Success)
-                    Console.WriteLine($@"Connection succeeded.{(result.Message?.Length > 0 ? result.Message : null)}");
-                else
-                    Console.WriteLine($@"Connection failed.{(result.Message?.Length > 0 ? " Reason: " + result.Message : null)}");
-
+                Console.WriteLine($@"{(result.Success ? @"Connection succeeded. " : @"Connection failed. ")}{result.Message}");
                 Thread.Sleep(1000);
             }
         }
@@ -43,6 +39,8 @@ namespace PortPing
         {
             var watch = new Stopwatch();
             var pingResult = new PingResult() { Success = false };
+
+            string getTime() => watch.ElapsedMilliseconds.ToString().PadLeft(timeout.ToString().Length);
             TcpClient client = null;
 
             try {
@@ -54,14 +52,14 @@ namespace PortPing
                         watch.Stop();
                         pingResult.Success = true;
                         pingResult.Message = 
-                            $@"Time: {watch.ElapsedMilliseconds.ToString().PadLeft(timeout.ToString().Length)}ms; " +
+                            $@"Time: {getTime()}ms; " +
                             $@"TTL: {client.Client.Ttl,3}; " +
                             $@"Protocol: {client.Client.ProtocolType}; " +
                             $@"From: {client.Client.LocalEndPoint,21}; " +
                             $@"To: {client.Client.RemoteEndPoint,21}";
                     }
                     else
-                        pingResult.Message = @"Unknown error.";
+                        pingResult.Message = $@"Time: {getTime()}ms; Unknown error.";
                 }
                 else
                     pingResult.Message = @"Timed out.";
@@ -69,7 +67,7 @@ namespace PortPing
             }
             catch (Exception ex) {
                 watch.Stop();
-                pingResult.Message = getAllMessages(ex);
+                pingResult.Message = $@"Time: {getTime()}ms; {getAllMessages(ex)}";
             }
             finally {
                 pingResult.LatencyMs = watch.ElapsedMilliseconds;
