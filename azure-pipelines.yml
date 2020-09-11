@@ -12,6 +12,8 @@ trigger:
             - README.md
             - azure-pipelines.yml
 
+pr: none
+
 pool:
   vmImage: 'windows-latest'
 
