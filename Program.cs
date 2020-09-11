@@ -31,30 +31,33 @@ namespace PortPing
 
             // parse arguments
             string arg_host;
-            int arg_port, arg_timeout;
-            //ProtocolType arg_protocol;
-            IPEndPoint arg_source;
+            int arg_port;
+            // optional arguments
+            var arg_timeout = 5000;
+            //var arg_protocol = ProtocolType.Tcp;
+            IPEndPoint arg_source = null;
 
             try {
                 string[] _sa; int _i;
 
                 _sa = args[0].Split(':');
                 arg_host = _sa[0];
-                int.TryParse(_sa[1], out arg_port);
+                arg_port = int.Parse(_sa[1]);
 
                 _i = Array.IndexOf(args, @"-t");
-                arg_timeout = _i == -1 ? 2000 : int.Parse(args[_i + 1]);
+                if (_i > 0) arg_timeout = int.Parse(args[_i + 1]);
 
                 //_i = Array.IndexOf(args, @"-p");
-                //arg_protocol = _i == -1 ? ProtocolType.Tcp : (ProtocolType)Enum.Parse(typeof(ProtocolType), args[_i + 1], true);
+                //if (_i > 0) arg_protocol = (ProtocolType)Enum.Parse(typeof(ProtocolType), args[_i + 1], true);
 
                 _i = Array.IndexOf(args, @"-s");
-                _sa = args[_i + 1].Split(':');
-                arg_source = _i == -1 ? null : new IPEndPoint(IPAddress.Parse(_sa[0]), _sa.Length > 1 ? int.Parse(_sa[1]) : 0);
-
-                if (!NetworkInterface.GetAllNetworkInterfaces().Where(ii => ii.OperationalStatus == OperationalStatus.Up)
-                    .SelectMany(ii => ii.GetIPProperties().UnicastAddresses).Any(ii => ii.Address.Equals(arg_source.Address)))
-                    throw new ArgumentException(@"Source address is invalid.");
+                if (_i > 0) {
+                    _sa = args[_i + 1].Split(':');
+                    arg_source = new IPEndPoint(IPAddress.Parse(_sa[0]), _sa.Length > 1 ? int.Parse(_sa[1]) : 0);
+                    if (!NetworkInterface.GetAllNetworkInterfaces().Where(ii => ii.OperationalStatus == OperationalStatus.Up)
+                        .SelectMany(ii => ii.GetIPProperties().UnicastAddresses).Any(ii => ii.Address.Equals(arg_source.Address)))
+                        throw new ArgumentException(@"Source address is invalid.");
+                }
             }
             catch (Exception ex) {
                 Console.WriteLine($"Invalid arguments.\r\n{getAllMessages(ex)}");
@@ -79,7 +82,7 @@ namespace PortPing
             }
         }
 
-        static PingResult CheckPort(string host, int port, IPEndPoint source = null, int timeout = 2000)
+        static PingResult CheckPort(string host, int port, IPEndPoint source = null, int timeout = 5000)
         {
             var watch = new Stopwatch();
             var pingResult = new PingResult() { Success = false };
@@ -131,7 +134,7 @@ namespace PortPing
         private const string UsageInfo = @"
 Usage: portping.exe host:port [-t timeout] [-s source[:port]]
     host:port           The hostname / IP address and port to connect to.
-    -t timeout          Timeout in milliseconds to wait for each ping. Default is 2000ms.
+    -t timeout          Timeout in milliseconds to wait for each ping. Default is 5000ms.
     -s source[:port]    IP address of the source interface with optional port to use.
 ";
     }
