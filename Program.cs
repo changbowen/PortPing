@@ -34,7 +34,7 @@ namespace PortPing
             int arg_port;
             // optional arguments
             var arg_timeout = 5000;
-            //var arg_protocol = ProtocolType.Tcp;
+            var arg_interval = 1000;
             IPEndPoint arg_source = null;
 
             try {
@@ -47,8 +47,8 @@ namespace PortPing
                 _i = Array.IndexOf(args, @"-t");
                 if (_i > 0) arg_timeout = int.Parse(args[_i + 1]);
 
-                //_i = Array.IndexOf(args, @"-p");
-                //if (_i > 0) arg_protocol = (ProtocolType)Enum.Parse(typeof(ProtocolType), args[_i + 1], true);
+                _i = Array.IndexOf(args, @"-i");
+                if (_i > 0) arg_interval = int.Parse(args[_i + 1]);
 
                 _i = Array.IndexOf(args, @"-s");
                 if (_i > 0) {
@@ -60,7 +60,7 @@ namespace PortPing
                 }
             }
             catch (Exception ex) {
-                Console.WriteLine($"Invalid arguments.\r\n{getAllMessages(ex)}");
+                Console.WriteLine($"Error parsing arguments.\r\n{GetAllMessages(ex)}");
                 return;
             }
 
@@ -71,15 +71,35 @@ namespace PortPing
                 $@"{(pingResult.Source != null ? $@"From: {pingResult.Source,21}; " : null)}" +
                 $@"{(pingResult.Destination != null ? $@"To: {pingResult.Destination,21}; " : null)}";
 
-            while (true) {
-                var result = CheckPort(arg_host, arg_port, arg_source, arg_timeout);
-                if (result.Success)
-                    Console.WriteLine($"Connection succeeded. {formatResult(result)}");
-                else
-                    Console.WriteLine($"Connection failed. {formatResult(result)}Error: {result.ErrorMsg}");
+            int received = 0, lost = 0;
+            float minMs = float.MaxValue, maxMs = 0f, avgLatMs = 0f, totalLatSec = 0f;
+            bool run = true;
 
-                Thread.Sleep(1000);
+            Console.CancelKeyPress += (sender, e) => { e.Cancel = true; run = false; };
+
+            while (run) {
+                var result = CheckPort(arg_host, arg_port, arg_source, arg_timeout);
+                if (result.Success) {
+                    Console.WriteLine($"Connection succeeded. {formatResult(result)}");
+                    received += 1;
+                    minMs = Math.Min(result.LatencyMs, minMs);
+                    maxMs = Math.Max(result.LatencyMs, maxMs);
+                    totalLatSec += result.LatencyMs / 1000f;
+                    avgLatMs = totalLatSec / received * 1000f;
+                }
+                else {
+                    Console.WriteLine($"Connection failed. {formatResult(result)}Error: {result.ErrorMsg}");
+                    lost += 1;
+                }
+
+                Thread.Sleep(arg_interval);
             }
+
+            Console.WriteLine($@"
+Ping statistics to {arg_host} on port {arg_port}{(arg_source != null ? $@" from {arg_source}" : string.Empty)}:
+    Sent: {received + lost}, Received: {received}, Lost: {lost}
+    Minimum: {minMs}ms, Maximum: {maxMs}ms, Average: {avgLatMs}ms
+");
         }
 
         static PingResult CheckPort(string host, int port, IPEndPoint source = null, int timeout = 5000)
@@ -107,7 +127,7 @@ namespace PortPing
             }
             catch (Exception ex) {
                 watch.Stop();
-                pingResult.ErrorMsg = getAllMessages(ex);
+                pingResult.ErrorMsg = GetAllMessages(ex);
             }
             finally {
                 pingResult.LatencyMs = watch.ElapsedMilliseconds;
@@ -123,12 +143,12 @@ namespace PortPing
             return pingResult;
         }
 
-        private static string getAllMessages(Exception outer)
+        private static string GetAllMessages(Exception outer)
         {
             if (outer.InnerException == null)
                 return $@"{outer.Message}";
             else
-                return $@"{outer.Message} ({getAllMessages(outer.InnerException)})";
+                return $@"{outer.Message} ({GetAllMessages(outer.InnerException)})";
         }
 
         private const string UsageInfo = @"
@@ -136,6 +156,7 @@ Usage: portping.exe host:port [-t timeout] [-s source[:port]]
     host:port           The hostname / IP address and port to connect to.
     -t timeout          Timeout in milliseconds to wait for each ping. Default is 5000ms.
     -s source[:port]    IP address of the source interface with optional port to use.
+    -i interval         Interval in milliseconds to wait between each ping. Default is 1000ms.
 ";
     }
 }
