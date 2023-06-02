@@ -22,6 +22,8 @@ namespace PortPing
 
     class Program
     {
+        internal static Stopwatch watch = new Stopwatch();
+
         static void Main(string[] args)
         {
             if (args?.Length == 0 || !args[0].Contains(":")) {
@@ -72,7 +74,8 @@ namespace PortPing
                 $@"{(pingResult.Destination != null ? $@"To: {pingResult.Destination,21}; " : null)}";
 
             int received = 0, lost = 0;
-            float minMs = float.MaxValue, maxMs = 0f, avgLatMs = 0f, totalLatSec = 0f;
+            float? minMs = null, maxMs = null, avgLatMs = null;
+            float totalLatSec = 0f;
             bool run = true;
 
             Console.CancelKeyPress += (sender, e) => { e.Cancel = true; run = false; };
@@ -82,8 +85,8 @@ namespace PortPing
                 if (result.Success) {
                     Console.WriteLine($"Connection succeeded. {formatResult(result)}");
                     received += 1;
-                    minMs = Math.Min(result.LatencyMs, minMs);
-                    maxMs = Math.Max(result.LatencyMs, maxMs);
+                    minMs = Math.Min(result.LatencyMs, minMs ?? float.PositiveInfinity);
+                    maxMs = Math.Max(result.LatencyMs, maxMs ?? 0f);
                     totalLatSec += result.LatencyMs / 1000f;
                     avgLatMs = totalLatSec / received * 1000f;
                 }
@@ -98,13 +101,12 @@ namespace PortPing
             Console.WriteLine($@"
 Ping statistics to {arg_host} on port {arg_port}{(arg_source != null ? $@" from {arg_source}" : string.Empty)}:
     Sent: {received + lost}, Received: {received}, Lost: {lost}
-    Minimum: {minMs}ms, Maximum: {maxMs}ms, Average: {avgLatMs}ms
+    Minimum: {minMs ?? 0:0.#} ms, Maximum: {maxMs ?? 0:0.#} ms, Average: {avgLatMs ?? 0:0.#} ms
 ");
         }
 
         static PingResult CheckPort(string host, int port, IPEndPoint source = null, int timeout = 5000)
         {
-            var watch = new Stopwatch();
             var pingResult = new PingResult() { Success = false };
             TcpClient client = null;
 
