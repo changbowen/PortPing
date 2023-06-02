@@ -67,7 +67,7 @@ namespace PortPing
             }
 
             string formatResult(PingResult pingResult) =>
-                $@"Time: {pingResult.LatencyMs.ToString().PadLeft(arg_timeout.ToString().Length)}ms; " +
+                $@"Time: {pingResult.LatencyMs.ToString().PadLeft(arg_timeout.ToString().Length)} ms; " +
                 $@"{(pingResult.Ttl != default ? $@"TTL: {pingResult.Ttl,3}; " : null)}" +
                 $@"{(pingResult.Protocol != default ? $@"Protocol: {pingResult.Protocol}; " : null)}" +
                 $@"{(pingResult.Source != null ? $@"From: {pingResult.Source,21}; " : null)}" +
